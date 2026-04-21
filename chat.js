@@ -1,12 +1,5 @@
 import fetch from 'node-fetch';
-
-/**
- * This code is provided for educational purposes.
- * Scraping may be against the terms of service of the website.
- * Use it at your own risk.
- * @author wolep
- * plugin by noureddine ouafy
- */
+globalThis.fetch = fetch;
 
 const gemini = {
     getNewCookie: async function (retries = 3) {
@@ -95,13 +88,13 @@ const gemini = {
                             break;
                         }
                     } catch (e) {
-                        // Continue to next chunk
+                        // Continue
                     }
                 }
 
                 if (!found) {
                     if (attempt < retries - 1 && previousId) {
-                        previousId = null; // Reset session and retry
+                        previousId = null;
                         continue;
                     }
                     throw new Error("No valid response received from API.");
@@ -117,39 +110,38 @@ const gemini = {
     }
 };
 
-const geminiSessions = {};
+// Auto conversation demo
+const runConversation = async () => {
+    console.log('🤖 Gemini AI - Full Conversation Demo\n');
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
-    if (!text) throw `Please enter a prompt. \n\n*Example:* ${usedPrefix + command} Hello, what is the capital of Australia?`;
+    const messages = [
+        "Hello! How are you today?",
+        "Tell me a joke about programming",
+        "What is artificial intelligence?",
+        "Can you write a short poem about technology?"
+    ];
 
-    if (text.toLowerCase() === '--reset') {
-        delete geminiSessions[m.sender];
-        return m.reply('🤖 Conversation history has been reset.');
+    let sessionId = null;
+
+    for (const msg of messages) {
+        console.log(`\nYou: ${msg}`);
+        try {
+            process.stdout.write('🤖 ');
+            const result = await gemini.ask(msg, sessionId, 3);
+            sessionId = result.id;
+            console.log(result.text);
+            await new Promise(r => setTimeout(r, 2000)); // 2 second delay
+        } catch (e) {
+            console.error(`❌ Error: ${e.message}`);
+            sessionId = null; // Reset on error
+            await new Promise(r => setTimeout(r, 3000)); // Wait longer before next attempt
+        }
     }
 
-    try {
-        await m.reply('🤔 Thinking...');
-
-        const previousId = geminiSessions[m.sender];
-        const result = await Promise.race([
-            gemini.ask(text, previousId),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Response timeout')), 30000))
-        ]);
-        geminiSessions[m.sender] = result.id;
-        await conn.reply(m.chat, result.text, m);
-
-    } catch (e) {
-        console.error(e);
-        const errorMsg = e.message.includes('timeout')
-            ? 'My response took too long. Please try again with a shorter prompt.'
-            : `Sorry, an error occurred. ${e.message}`;
-        m.reply(`❌ ${errorMsg}`);
-    }
+    console.log('\n✅ Conversation complete!\n');
 };
 
-handler.help = ['gemini'];
-handler.tags = ['ai'];
-handler.command = /^(gemini)$/i;
-handler.limit = true;
-
-export default handler;
+runConversation().catch(e => {
+    console.error('Fatal error:', e);
+    process.exit(1);
+});
